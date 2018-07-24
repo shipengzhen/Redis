@@ -7,7 +7,7 @@ package com.bdqn.spz.redis.test;
 import java.util.Set;
 
 
-import com.bdqn.spz.redis.util.JedisUtil;
+import com.bdqn.spz.redis.util.JedisUtils;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
@@ -27,7 +27,7 @@ public class Test {
 	}
 	
 	public void jedisCluster(){
-		JedisCluster jedisCluster=JedisUtil.getJedisCluster();
+		JedisCluster jedisCluster=JedisUtils.getJedisCluster();
 		int num = 1000;
 		String key = "name";
 		String value = "spz";
@@ -49,13 +49,13 @@ public class Test {
 		JedisPool jedisPool=null;
 		Jedis jedis=null;
 		try {
-			jedisPool=JedisUtil.getJedisPool();
+			jedisPool=JedisUtils.getJedisPool();
 			jedis=jedisPool.getResource();
 			System.out.println(jedis.get("name"));
 		} catch (Exception e) {
 			e.printStackTrace();
 		} finally{
-			JedisUtil.release(jedisPool, jedis);
+			JedisUtils.release(jedisPool, jedis);
 		}
 	}
 	

@@ -1,365 +1,178 @@
 package com.bdqn.spz.redis.util;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
-import javax.annotation.Resource;
 import org.apache.log4j.Logger;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.JedisShardInfo;
+import redis.clients.jedis.ShardedJedis;
+import redis.clients.jedis.ShardedJedisPool;
 import redis.clients.jedis.SortingParams;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
+import redis.clients.jedis.exceptions.JedisException;
 
 /**
- * Redis缓存操作的工具类<br>
- * <p>
- * Copyright: Copyright (c) Nov 7, 2013 10:31:44 AM
- * <p>
- * Company: 欣网视讯
- * <p>
- * @author houxu@xwtec.cn
- * @version 1.0.0
+ * redis 客户端
+ * 
+ * @author sunyanxia
+ *
  */
-public class JedisUtil {
+public class RedisClient {
+    private static final Logger logger = Logger.getLogger(RedisClient.class);
 
     /**
-     * logger 日志记录器
+     * 服务器地址
      */
-    private final Logger logger = Logger.getLogger(JedisUtil.class);
+    private static final String HOST = "host";
 
     /**
-     * jedisPool redis连接池
+     * 服务器端口
      */
-    @Resource(name = "jedisPool")
-    public JedisPool jedisPool;
+    private static final String PORT = "port";
 
     /**
-     * 方法描述:从连接池获取jedis对象
-     * @return 返回Jedis的有效对象
-     * date:Nov 14, 2013
-     * add by: houxu@xwtec.cn
+     * redis ip
      */
-    public Jedis getResource() throws Exception {
-        logger.debug("[JedisUtil:getResource]: get jedis Resource from Pool...");
-        Jedis jedis = null;//声明jedis对象
-        int cycleTimes = 0;//出现异常已经循环获取的次数
-        try {
-            jedis = this.jedisPool.getResource();//从pool中获取jedis对象
-        } catch (JedisConnectionException ex) {
-            try {
-                //获取占用异常,捕获异常,等待0.5秒后继续执行获取
-                logger.debug(
-                        "[JedisUtil:getResource]:redis pool is full,Program will sleep 0.5s to wait an idle.message:\n"
-                                + ex.getMessage());
+    String host = ConfigReadUtil.getInstance().getProperty("redis.content.ip");
 
-                while (cycleTimes < 3) {
-                    cycleTimes++;//获取次数 +1;
-                    Thread.sleep(500);//等待0.5s
+    /**
+     * redis port
+     */
+    String port = ConfigReadUtil.getInstance().getProperty("redis.content.port");
 
-                    logger.debug("[JedisUtil:getResource]:waiting to get an idle...");
-                    try {
-                        jedis = this.jedisPool.getResource();//重新获取jedis对象
-                    } catch (JedisConnectionException ex1) {
-                        logger.debug("[JedisUtil:getResource]:get an idle failed.Program will try again.");
-                        //出现获取异常,继续执行
-                        continue;
-                    }
+    /**
+     * 最大能够保持idel状态的对象数
+     */
+    String maxIdle = ConfigReadUtil.getInstance().getProperty("redis.pool.maxIdle");
 
-                    //获取到对象后跳出循环
-                    if (jedis != null) {
-                        //输出获取成功的消息
-                        logger.debug("[JedisUtil:getResource]:get an idle success.");
-                        break;
-                    } else { //如果获取出对象为null,则继续循环等待获取.
-                        logger.debug("[JedisUtil:getResource]:get an idle is null.Program will try again.");
-                        continue;
-                    }
-                }
-            }
-            //处理线程截断异常
-            catch (InterruptedException e) {
-                logger.error("[JedisUtil:getResource]:get jedis object failed.message:\n" + e.getMessage());
-            }
+    /**
+     * 最大分配的对象数
+     */
+    String maxTotal = ConfigReadUtil.getInstance().getProperty("redis.pool.maxTotal");
+
+    /**
+     * 当池内没有返回对象时，最大等待时间
+     */
+    String maxWait = ConfigReadUtil.getInstance().getProperty("redis.pool.maxWait");
+
+    /**
+     * 当调用borrow Object方法时，是否进行有效性检查
+     */
+    String testOnBorrow = ConfigReadUtil.getInstance().getProperty("redis.pool.testOnBorrow");
+
+    /**
+     * 初始化ShardedJedisPool
+     */
+    private ShardedJedisPool shardedJedisPool = null;
+
+    /**
+     * 服务器列表信息
+     */
+    private List<Map<String, String>> serverList = null;
+
+    /**
+     * redis分片
+     */
+    private List<JedisShardInfo> shards = new ArrayList<JedisShardInfo>();
+
+    public RedisClient() {
+
+        if (null == serverList) {
+            serverList = new ArrayList<Map<String, String>>();
+
+            Map<String, String> map = new HashMap<String, String>();
+            map.put("host", host);
+            map.put("port", port);
+            serverList.add(map);
         }
-        //获取对象如果不为空则返回
-        if (jedis != null) {
-            logger.debug("[JedisUtil:getResource]: get jedis Resource from Pool success.");
-        } else {//当循环获取超过三次直接抛出异常 返回null
-            logger.error(
-                    "[JedisUtil:getResource]:get jedis object failed.if redis server is runing,please check the configration and Network connection.");
-            throw new Exception("server can not get jedis Resource!");
-        }
-        return jedis;
-    }
+        initShardedJedisPool();
 
-    /**
-     * 方法描述:使用完毕后将jedis对象归还连接池
-     * @param Jedis 从pool中获取的jedis对象
-     * date:Nov 14, 2013
-     * add by: houxu@xwtec.cn
-     */
-    public void returnResource(Jedis jedis) {
-        try {
-            if (jedis != null)
-                this.jedisPool.returnResource(jedis);//归还对象至pool
-            logger.debug("[JedisUtil:returnResource]: return jedis Resource to Pool  ...");
-        } catch (JedisConnectionException ex) {
-            //归还失败,强制销毁该链接
-            this.jedisPool.returnBrokenResource(jedis);
+        if (null == shardedJedisPool) {
+            logger.info("<请确认push read redis服务器是否启动!>");
+            return;
         }
     }
 
     /**
-     * 方法描述:根据关键字从redis服务器中获取对应的value
-     * @param String key 键值
-     * @return 存储在redis中的value
-     * date:Nov 14, 2013
-     * add by: houxu@xwtec.cn
-     * @throws SPTException 
-     */
-    public String getRedisStrValue(String key) throws Exception {
-
-        Jedis jedis = null;//声明一个链接对象
-        String value = null;//获取的键值所对应的值
-
-        try {
-            jedis = this.getResource();//获取jedis资源
-
-            //资源不为空,则获取对应的value
-            if (jedis != null)
-                value = jedis.get(key);
-
-        } finally {
-            if (jedis != null)
-                this.returnResource(jedis);
-        }
-        return value;
-    }
-
-    /**
-     * 方法描述:往redis中注入缓存对象
-     * @param String key 对象的键值
-     * @param String value 键值所对应的值
-     * @return 返回成功与否,成功返回true 失败返回false
-     * date:Nov 18, 2013
-     * add by: houxu@xwtec.cn
-     * @throws SPTException 
-     */
-    public boolean setRedisStrValue(String key, String value) throws Exception {
-
-        Jedis jedis = null;//声明一个链接对象
-        boolean flag = true;//返回标记,默认成功
-
-        try {
-            jedis = this.getResource();//获取资源
-
-            //资源不为空则执行注入操作 否则返回注入失败
-            if (jedis != null)
-                jedis.set(key, value);
-            else
-                flag = false;
-        } finally {
-            //归还资源
-            if (jedis != null)
-                this.returnResource(jedis);
-        }
-        return flag;
-    }
-
-    /**
-     * 方法描述:往redis中注入缓存对象
-     * @param String key 对象的键值
-     * @param String value 键值所对应的值
-     * @param int seconds 键值存储时间,如果为负数,则不设存储上限时间 单位:秒
-     * @return 返回成功与否,成功返回true 失败返回false
-     * date:Nov 18, 2013
-     * add by: houxu@xwtec.cn
-     * @throws SPTException 
-     */
-    public boolean setRedisStrValue(String key, String value, int seconds) throws Exception {
-
-        boolean flag = true;//返回标记,默认成功
-
-        //如果设置时间为负数,则无上限时间
-        if (seconds <= 0) {
-            this.setRedisStrValue(key, value);
-            return flag;
-        }
-
-        Jedis jedis = null;//声明一个链接对象
-
-        try {
-            jedis = this.getResource();//获取资源
-
-            //资源不为空则执行注入操作 否则返回注入失败
-            if (jedis != null) {
-                //判断是否已经存在,如果已经存在则删除
-                if (jedis.exists(key)) {
-                    jedis.del(key);
-                }
-                //该方法内容为,如果含有相同的key值,则不覆盖.
-                jedis.setex(key, seconds, value);
-            } else
-                flag = false;
-        } finally {
-            //归还资源
-            if (jedis != null)
-                this.returnResource(jedis);
-        }
-        return flag;
-    }
-
-    /**
-     * 方法描述:删除redis中的缓存
-     * @param 缓存的key值
-     * @return 返回是否成功,成功:true 失败:false
-     * date:Nov 18, 2013
-     * add by: houxu@xwtec.cn
-     * @throws SPTException 
-     */
-    public boolean delRedisStrValue(String... keys) throws Exception {
-
-        Jedis jedis = null;//声明一个链接对象
-        boolean flag = true;//返回标记,默认成功
-        try {
-            jedis = this.getResource();//获取资源
-
-            //资源不为空则执行删除操作 否则返回注入失败
-            if (jedis != null)
-                jedis.del(keys);
-            else
-                flag = false;
-        } finally {
-            //归还资源
-            if (jedis != null)
-                this.returnResource(jedis);
-        }
-        return flag;
-    }
-
-    /**
-     * 方法描述:查询对应的缓存keys
-     * date:2013-11-19
-     * add by: liuwenbing@xwtec.cn
-     */
-    public Set<String> getKeys(String keyPrefix) {
-
-        logger.info("RedisUtil.getKeys param: " + keyPrefix);
-
-        Jedis jedis = null;//jedis对象
-        Set<String> keys = null;//keys列表
-
-        try {
-            //获取连接
-            jedis = this.getResource();
-            //根据前台传过来的规则获取缓存key列表
-            if (null != keyPrefix && !"".equals(keyPrefix)) {
-                keys = jedis.keys(keyPrefix);
-            }
-        } catch (Exception e) {
-            logger.error("[JedisUtil.getKeys]:failed. throw e:" + e.getMessage());
-        } finally {
-            //使用完毕后将jedis对象归还连接池
-            if (jedis != null)
-                jedisPool.returnResource(jedis);
-        }
-
-        return keys;
-    }
-
-    /**
-     * @功能描述：利用pipeline批量的将数据读入set中
-     * @参数说明：@param key
-     * @参数说明：@param list
-     * @参数说明：@return
-     * @作者： yuanzhen
-     * @创建时间：2017年8月21日 下午1:50:47
-     */
-    public boolean setRedisSetValue(String key, List<String> list) {
-        Jedis jedis = null;
-        boolean flag = true;
-        try {
-            jedis = this.getResource();//获取资源
-            //资源不为空则执行注入操作 否则返回注入失败
-            if (jedis != null) {
-                Pipeline pipeline = jedis.pipelined();
-                for (int i = 0; i < list.size(); i++) {
-                    pipeline.sadd(key, list.get(i));
-                }
-                pipeline.sync();
-                logger.info("数据已经放入" + key + "集合中...");
-            } else {
-                flag = false;
-                logger.error("redis连接初始化失败....");
-            }
-        } catch (Exception e) {
-            logger.error("数据存入redis失败...抛出异常" + e.getMessage());
-        } finally {
-            if (jedis != null) {
-                jedisPool.returnResource(jedis);
-            }
-        }
-        return flag;
-    }
-
-    /**
+     * 初始化客户端
      * 
-     * @功能描述：利用sidff方法获得以baseKey为基准的差异集合
-     * @参数说明：@param baseKey 以此key值为基准sidff
-     * @参数说明：@param otherKey 与此key值sidff
-     * @参数说明：@return
-     * @作者： yuanzhen
-     * @创建时间：2017年8月28日 下午4:13:51
+     * @param serverFileredis服务器配置信息文件
+     * @param sentinelFile
+     *            redis sentinel(哨兵)配置信息文件
      */
-    public Set<String> reconciliationSidff(String baseKey, String otherKey) {
-        Jedis jedis = null;
-        Set<String> rst = new HashSet<String>();
-        try {
-            jedis = this.getResource();
-            if (jedis != null) {
-                rst = jedis.sdiff(baseKey, otherKey);
-                logger.info("以" + baseKey + "为基准与" + otherKey + "对比完成...");
-            } else {
-                logger.error("redis连接初始化失败...");
+    public void initShardedJedisPool() {
+        long startTime = System.currentTimeMillis();
+
+        logger.info("-- redisClient initializer start...");
+        logger.info("-- redisClient connect to server:" + host + " - port:" + port + "...");
+        if (null == shards || shards.size() == 0) {
+            String host = null;
+            Integer port = null;
+            JedisShardInfo si = null;
+
+            for (Map<String, String> map : serverList) {
+                host = map.get(HOST).toString();
+                port = Integer.parseInt(map.get(PORT).toString());
+                si = new JedisShardInfo(host, port);
+                shards.add(si);
             }
-        } catch (Exception e) {
-            logger.error("以" + baseKey + "为基准与" + otherKey + "对比数据失败...失败原因:" + e.getMessage());
-        } finally {
-            if (jedis != null) {
-                jedisPool.returnResource(jedis);
-            }
+
+            JedisPoolConfig config = new JedisPoolConfig();
+            config.setMaxTotal(Integer.parseInt(maxTotal));
+            config.setMaxIdle(Integer.parseInt(maxIdle));
+            config.setMaxWaitMillis(Integer.parseInt(maxWait));
+            config.setTestOnBorrow(Boolean.parseBoolean(testOnBorrow));
+
+            shardedJedisPool = new ShardedJedisPool(config, shards);
         }
-        return rst;
+
+        logger.info(
+                "-- PushReadRedisClient initializer finish! times:" + (System.currentTimeMillis() - startTime) + "ms");
     }
 
     /**
-     * @功能描述：从redis中获取数据
-     * @参数说明：@param key redis的key值
-     * @参数说明：@param batch	批处理数量
-     * @参数说明：@return
-     * @作者： liuyi
-     * @创建时间：2017年8月29日 下午2:59:02
+     * 销毁连接池
      */
-    public List<Object> queryListByLPop(String key, int batch) {
-        List<Object> result = new ArrayList<Object>();
-        Jedis jedis = null;
-        try {
-            jedis = jedisPool.getResource();
-            Pipeline pipe = jedis.pipelined();
-            for (int i = 0; i < batch; i++) {
-                pipe.lpop(key);
-            }
-            result = pipe.syncAndReturnAll();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            jedisPool.returnResource(jedis);
+    public void destroy() {
+        if (shardedJedisPool != null) {
+            shardedJedisPool.destroy();
         }
-        return result;
+    }
+
+    /**
+     * 获得ShardedJedis
+     * 
+     * @return
+     */
+    private ShardedJedis getResource() {
+        return shardedJedisPool == null ? null : shardedJedisPool.getResource();
+    }
+
+    /**
+     * 异常情况处理
+     * 
+     * @param ShardedJedis
+     */
+    private void returnBrokenResource(ShardedJedis ShardedJedis) {
+        if (ShardedJedis != null && shardedJedisPool != null) {
+            shardedJedisPool.returnBrokenResource(ShardedJedis);
+            ShardedJedis = null;
+        }
+    }
+
+    /**
+     * 使用完成后归还ShardedJedis到連接池
+     * 
+     * @param ShardedJedis
+     */
+    private void returnResource(ShardedJedis ShardedJedis) {
+        if (ShardedJedis != null && shardedJedisPool != null) {
+            shardedJedisPool.returnResource(ShardedJedis);
+        }
     }
 
     /**
@@ -370,21 +183,21 @@ public class JedisUtil {
      *            关键字
      * @return 被删除 key 的数量。 <br>
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
-     * @throws Exception 
      * 
      */
     public Long del(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long quantity = null;
+        boolean broken = false;
         try {
-            shardedJedis = this.getResource();
+            shardedJedis = getResource();
             if (shardedJedis != null) {
                 quantity = shardedJedis.del(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return quantity;
     }
@@ -398,17 +211,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Boolean exists(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         boolean flag = false;
+        boolean broken = false;
         try {
-            shardedJedis = this.getResource();
+            shardedJedis = getResource();
             if (shardedJedis != null) {
                 flag = shardedJedis.exists(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return flag;
     }
@@ -426,17 +240,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long expire(String key, int seconds) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long resultCode = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 resultCode = shardedJedis.expire(key, seconds);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return resultCode;
     }
@@ -450,17 +265,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public List<String> sort(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         List<String> result = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 result = shardedJedis.sort(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return result;
     }
@@ -478,17 +294,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public List<String> sort(String key, SortingParams sortingParameters) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         List<String> result = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 result = shardedJedis.sort(key, sortingParameters);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return result;
     }
@@ -507,17 +324,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String type(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String type = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 type = shardedJedis.type(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return type;
     }
@@ -533,17 +351,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String set(String key, String value) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String status = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 status = shardedJedis.set(key, value);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return status;
     }
@@ -559,19 +378,20 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String set(String key, Object value) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String statusCode = null;
         byte[] valueBytes = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 valueBytes = CommonUtil.serialize(value);
                 statusCode = shardedJedis.set(key.getBytes(), valueBytes);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return statusCode;
     }
@@ -585,17 +405,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String get(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String value = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 value = shardedJedis.get(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
 
         return value;
@@ -611,17 +432,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Object get(byte[] key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         byte[] value = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 value = shardedJedis.get(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         Object obj = null;
         if (value != null) {
@@ -646,17 +468,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String lIndex(String key, long index) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String element = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 element = shardedJedis.lindex(key, index);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return element;
     }
@@ -672,17 +495,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long lLen(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long len = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 len = shardedJedis.llen(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return len;
     }
@@ -696,17 +520,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public String lPop(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         String element = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 element = shardedJedis.lpop(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
 
         return element;
@@ -724,17 +549,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long lPush(String key, String... strings) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long size = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 size = shardedJedis.lpush(key, strings);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return size;
     }
@@ -752,18 +578,19 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long lpush(String key, Object object) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long size = null;
         byte[] valueBytes = CommonUtil.serialize(object);
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 size = shardedJedis.lpush(key.getBytes(), valueBytes);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return size;
     }
@@ -781,18 +608,46 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long rpush(String key, Object object) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long size = null;
         byte[] valueBytes = CommonUtil.serialize(object);
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 size = shardedJedis.rpush(key.getBytes(), valueBytes);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
+        }
+        return size;
+    }
+
+    /**
+     * 将值 value 插入到列表 key 的表头，当且仅当 key 存在并且是一个列表。
+     * 
+     * @param key
+     *            关键字
+     * @param string
+     *            值
+     * @return 表的长度。 <br>
+     *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
+     */
+    public Long lPushx(String key, String... string) {
+        ShardedJedis shardedJedis = null;
+        Long size = null;
+        boolean broken = false;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                size = shardedJedis.lpushx(key, string);
+            }
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
+        } finally {
+            closeResource(shardedJedis, broken);
         }
         return size;
     }
@@ -813,17 +668,18 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public List<String> lRange(String key, long start, long end) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         List<String> elements = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 elements = shardedJedis.lrange(key, start, end);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
         return elements;
     }
@@ -839,18 +695,19 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public List<Object> lrange(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         List<Object> list = new ArrayList<Object>();
         List<byte[]> bytes = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 bytes = shardedJedis.lrange(key.getBytes(), 0, -1);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
 
         if (bytes != null && bytes.size() > 0) {
@@ -876,17 +733,49 @@ public class JedisUtil {
      *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
      */
     public Long lRem(String key, long count, String value) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long quantity = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 quantity = shardedJedis.lrem(key, count, value);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
+        }
+        return quantity;
+    }
+
+    /**
+     * 根据参数 count 的值，移除列表中与参数 value 相等的元素。
+     * 
+     * @param key
+     *            关键字
+     * @param count
+     *            数量
+     * @param Object
+     *            值,被序列化成字节
+     * @return 被移除元素的数量。 <br>
+     *         因为不存在的 key 被视作空表(empty list)，所以当 key 不存在时， LREM 命令总是返回 0 。 <br>
+     *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
+     */
+    public Long lRem(String key, long count, Object object) {
+        ShardedJedis shardedJedis = null;
+        Long quantity = null;
+        byte[] valueBytes = CommonUtil.serialize(object);
+        boolean broken = false;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                quantity = shardedJedis.lrem(key.getBytes(), count, valueBytes);
+            }
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
+        } finally {
+            closeResource(shardedJedis, broken);
         }
         return quantity;
     }
@@ -897,17 +786,18 @@ public class JedisUtil {
      * @return
      */
     public Long ttl(String key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long value = null;
+        boolean broken = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
                 value = shardedJedis.ttl(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
 
         return value;
@@ -919,26 +809,42 @@ public class JedisUtil {
      * @return
      */
     public Long ttl(byte[] key) {
-        Jedis shardedJedis = null;
+        ShardedJedis shardedJedis = null;
         Long value = null;
+        boolean broken = false;
         try {
-            shardedJedis = this.getResource();
+            shardedJedis = getResource();
             if (shardedJedis != null) {
                 value = shardedJedis.ttl(key);
             }
-        } catch (Exception e) {
-            handleJedisException(e);
+        } catch (JedisException e) {
+            broken = handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            closeResource(shardedJedis, broken);
         }
 
         return value;
     }
 
-    private boolean handleJedisException(Exception jedisException) {
+    private void closeResource(ShardedJedis shardedJedis, boolean conectionBroken) {
+        try {
+            if (conectionBroken) {
+                shardedJedisPool.returnBrokenResource(shardedJedis);
+            } else {
+                shardedJedisPool.returnResource(shardedJedis);
+            }
+        } catch (Exception e) {
+            logger.error("return back jedis failed, will fore close the jedis.", e);
+            shardedJedisPool.destroy();
+        }
+    }
+
+    private boolean handleJedisException(JedisException jedisException) {
         if (jedisException instanceof JedisConnectionException) {
+            logger.error("Redis connection " + shardedJedisPool + " lost.", jedisException);
         } else if (jedisException instanceof JedisDataException) {
             if ((jedisException.getMessage() != null) && (jedisException.getMessage().indexOf("READONLY") != -1)) {
+                logger.error("Redis connection " + shardedJedisPool + " are read-only slave.", jedisException);
             } else {
                 // dataException, isBroken=false
                 return false;
@@ -948,5 +854,4 @@ public class JedisUtil {
         }
         return true;
     }
-
 }
