@@ -21,8 +21,8 @@ import redis.clients.jedis.exceptions.JedisException;
  * @author sunyanxia
  *
  */
-public class RedisClient {
-    private static final Logger logger = Logger.getLogger(RedisClient.class);
+public class JedisClient {
+    private static final Logger logger = Logger.getLogger(JedisClient.class);
 
     /**
      * 服务器地址
@@ -79,7 +79,7 @@ public class RedisClient {
      */
     private List<JedisShardInfo> shards = new ArrayList<JedisShardInfo>();
 
-    public RedisClient() {
+    public JedisClient() {
 
         if (null == serverList) {
             serverList = new ArrayList<Map<String, String>>();

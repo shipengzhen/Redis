@@ -42,13 +42,39 @@
 		class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory">
 		<property name="hostName" value="${redis.host}"></property>
 		<property name="port" value="${redis.port}"></property>
-		<property name="password" value="${redis.pass}"></property>
+		<!-- <property name="password" value="${redis.pass}"></property> -->
 		<property name="poolConfig" ref="poolConfig"></property>
 	</bean>
 
-	<bean id="redisTemplate" class="org.springframework.data.redis.core.StringRedisTemplate">
-		<property name="connectionFactory" ref="jedisConnectionFactory" />
+	<!-- redis template definition p表示对该bean里面的属性进行注入，格式为p:属性名=注入的对象 效果与在bean里面使用<property>标签一样 -->
+	<bean id="redisTemplate" class="org.springframework.data.redis.core.RedisTemplate"
+		p:connection-factory-ref="jedisConnectionFactory">
+		<!-- <property name="connectionFactory" ref="jedisConnectionFactory" /> -->
+		<!-- 序列化方式 建议key/hashKey采用StringRedisSerializer。 -->
+		<property name="keySerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+		</property>
+		<property name="hashKeySerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.StringRedisSerializer" />
+		</property>
+		<property name="valueSerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.JdkSerializationRedisSerializer" />
+		</property>
+		<property name="hashValueSerializer">
+			<bean
+				class="org.springframework.data.redis.serializer.JdkSerializationRedisSerializer" />
+		</property>
 	</bean>
+
+	<!-- 对string操作的封装 -->
+	<bean id="stringRedisTemplate" class="org.springframework.data.redis.core.StringRedisTemplate"
+		p:connection-factory-ref="jedisConnectionFactory">
+		<!-- <property name="connectionFactory" ref="jedisConnectionFactory" /> -->
+	</bean>
+
 
 	<!-- jedis方式1 -->
 	<!--单机版 -->
@@ -80,7 +106,7 @@
 		<constructor-arg name="timeout" value="1000"></constructor-arg>
 		<constructor-arg name="password" value="${redis.pass}"></constructor-arg>
 	</bean>
-	
+
 	<!--集群版 -->
 	<bean id="hostAndPort1" class="redis.clients.jedis.HostAndPort">
 		<constructor-arg name="host" value="${redis.cluster.host1}"></constructor-arg>
@@ -107,26 +133,13 @@
 		<constructor-arg name="port" value="${redis.cluster.port6}"></constructor-arg>
 	</bean>
 
-	<!-- <bean id="jedisCluster" class="redis.clients.jedis.JedisCluster">
-		<constructor-arg name="jedisClusterNode">
-			<set>
-				<ref bean="hostAndPort1" />
-				<ref bean="hostAndPort2" />
-				<ref bean="hostAndPort3" />
-				<ref bean="hostAndPort4" />
-				<ref bean="hostAndPort5" />
-				<ref bean="hostAndPort6" />
-			</set>
-		</constructor-arg>
-		设置连接超时时间
-		<constructor-arg name="connectionTimeout" value="10"></constructor-arg>
-		设置网络通信超时时间
-		<constructor-arg name="soTimeout" value="1000"></constructor-arg>
-		设置最大重试次数
-		<constructor-arg name="maxAttempts" value="10"></constructor-arg>
-		设置集群访问密码
-		<constructor-arg name="password" value="${redis.pass}"></constructor-arg>
-		设置jedisPool配置
-		<constructor-arg name="poolConfig" ref="poolConfig"></constructor-arg>
-	</bean> -->
+	<!-- <bean id="jedisCluster" class="redis.clients.jedis.JedisCluster"> <constructor-arg 
+		name="jedisClusterNode"> <set> <ref bean="hostAndPort1" /> <ref bean="hostAndPort2" 
+		/> <ref bean="hostAndPort3" /> <ref bean="hostAndPort4" /> <ref bean="hostAndPort5" 
+		/> <ref bean="hostAndPort6" /> </set> </constructor-arg> 设置连接超时时间 <constructor-arg 
+		name="connectionTimeout" value="10"></constructor-arg> 设置网络通信超时时间 <constructor-arg 
+		name="soTimeout" value="1000"></constructor-arg> 设置最大重试次数 <constructor-arg 
+		name="maxAttempts" value="10"></constructor-arg> 设置集群访问密码 <constructor-arg 
+		name="password" value="${redis.pass}"></constructor-arg> 设置jedisPool配置 <constructor-arg 
+		name="poolConfig" ref="poolConfig"></constructor-arg> </bean> -->
 </beans>
