@@ -14,77 +14,77 @@ import redis.clients.jedis.JedisPoolConfig;
 
 /**
  * 
- * @author Ê©ÅôÕñ date 2017Äê12ÔÂ12ÈÕ time ÏÂÎç2:55:24
+ * @author æ–½é¹æŒ¯ date 2017å¹´12æœˆ12æ—¥ time ä¸‹åˆ2:55:24
  */
 public class JedisUtil {
 
-	private static JedisPoolConfig jedisPoolConfig;
-	private static volatile JedisPool jedisPool;// valatile ²»ÎÈ¶¨µÄ
-	private static JedisCluster jedisCluster;
+    private static JedisPoolConfig jedisPoolConfig;
+    private static volatile JedisPool jedisPool;// valatile ä¸ç¨³å®šçš„
+    private static JedisCluster jedisCluster;
 
-	private JedisUtil() {
-	}
+    private JedisUtil() {
+    }
 
-	// Êı¾İ¿âÁ´½Ó³ØÅäÖÃ
-	public static JedisPoolConfig getJedisPoolConfig() {
-		if (jedisPoolConfig == null) {
-			synchronized (JedisUtil.class) {
-				if (jedisPoolConfig == null) {
-					jedisPoolConfig = new JedisPoolConfig();
-					jedisPoolConfig.setMaxTotal(1000);// ×î´óÁ¬½Ó×ÜÊı£¬-1±íÊ¾²»ÏŞÖÆ
-					jedisPoolConfig.setMaxIdle(50);// ¿ØÖÆÒ»¸öpool×î¶àÓĞ¶àÉÙ¸ö×´Ì¬Îªidle(¿ÕÏĞ)µÄjedisÊµÀı
-					jedisPoolConfig.setMinIdle(20); // ¿ØÖÆÒ»¸öpool×îÉÙÓĞ¶àÉÙ¸ö×´Ì¬Îªidle(¿ÕÏĞ)µÄjedisÊµÀı
-					jedisPoolConfig.setMaxWaitMillis(6 * 1000);// ±íÊ¾µ±borrowÒ»¸öjedisÊµÀıÊ±£¬×î´óµÄµÈ´ıÊ±¼ä£¬Èç¹ûµÈ´ı³¬Ê±£¬Ö±½ÓÅ×³öJedisConnectionException
-					jedisPoolConfig.setTestOnBorrow(true);// »ñµÃÒ»¸öjedisÊµÀıµÄÊ±ºòÊÇ·ñ¼ì²éÁ·¼¶½Ó¿ÉÓÃĞÔ(ping());Èç¹ûÎªtrue£¬ÔòµÃµ½µÄjedisÊµÀı¾ùÊÇ¿ÉÓÃµÄ
-					// jedisPoolConfig.setTestOnReturn(true);//returnÒ»¸öjedisÊµÀı¸øpoolÊ±£¬ÊÇ·ñ¼ì²é¿ÉÓÃĞÔ(ping())
-				}
-			}
-		}
-		return jedisPoolConfig;
-	}
+    // æ•°æ®åº“é“¾æ¥æ± é…ç½®
+    public static JedisPoolConfig getJedisPoolConfig() {
+        if (jedisPoolConfig == null) {
+            synchronized (JedisUtil.class) {
+                if (jedisPoolConfig == null) {
+                    jedisPoolConfig = new JedisPoolConfig();
+                    jedisPoolConfig.setMaxTotal(1000);// æœ€å¤§è¿æ¥æ€»æ•°ï¼Œ-1è¡¨ç¤ºä¸é™åˆ¶
+                    jedisPoolConfig.setMaxIdle(50);// æ§åˆ¶ä¸€ä¸ªpoolæœ€å¤šæœ‰å¤šå°‘ä¸ªçŠ¶æ€ä¸ºidle(ç©ºé—²)çš„jediså®ä¾‹
+                    jedisPoolConfig.setMinIdle(20); // æ§åˆ¶ä¸€ä¸ªpoolæœ€å°‘æœ‰å¤šå°‘ä¸ªçŠ¶æ€ä¸ºidle(ç©ºé—²)çš„jediså®ä¾‹
+                    jedisPoolConfig.setMaxWaitMillis(6 * 1000);// è¡¨ç¤ºå½“borrowä¸€ä¸ªjediså®ä¾‹æ—¶ï¼Œæœ€å¤§çš„ç­‰å¾…æ—¶é—´ï¼Œå¦‚æœç­‰å¾…è¶…æ—¶ï¼Œç›´æ¥æŠ›å‡ºJedisConnectionException
+                    jedisPoolConfig.setTestOnBorrow(true);// è·å¾—ä¸€ä¸ªjediså®ä¾‹çš„æ—¶å€™æ˜¯å¦æ£€æŸ¥ç»ƒçº§æ¥å¯ç”¨æ€§(ping());å¦‚æœä¸ºtrueï¼Œåˆ™å¾—åˆ°çš„jediså®ä¾‹å‡æ˜¯å¯ç”¨çš„
+                    // jedisPoolConfig.setTestOnReturn(true);//returnä¸€ä¸ªjediså®ä¾‹ç»™poolæ—¶ï¼Œæ˜¯å¦æ£€æŸ¥å¯ç”¨æ€§(ping())
+                }
+            }
+        }
+        return jedisPoolConfig;
+    }
 
-	// Á¬½Ó³Ø
-	public static JedisPool getJedisPool() {
-		if (jedisPool == null) {
-			synchronized (JedisUtil.class) {
-				if (jedisPool == null) {
-					jedisPool = new JedisPool(getJedisPoolConfig(), "192.168.88.131", 6379, 1000, "spz");
-				}
-			}
-		}
-		return jedisPool;
-	}
+    // è¿æ¥æ± 
+    public static JedisPool getJedisPool() {
+        if (jedisPool == null) {
+            synchronized (JedisUtil.class) {
+                if (jedisPool == null) {
+                    jedisPool = new JedisPool(getJedisPoolConfig(), "192.168.88.131", 6379, 1000, "spz");
+                }
+            }
+        }
+        return jedisPool;
+    }
 
-	// ¼¯Èº
-	public static JedisCluster getJedisCluster() {
+    // é›†ç¾¤
+    public static JedisCluster getJedisCluster() {
 
-		if (jedisCluster == null) {
-			synchronized (JedisUtil.class) {
-				if (jedisCluster == null) {
-					// Redis¼¯ÈºµÄ½Úµã¼¯ºÏ
-					Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 1000));
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 1001));
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 2000));
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 2001));
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 3000));
-					jedisClusterNodes.add(new HostAndPort("192.168.88.131", 3001));
-					// ¸ù¾İ½Úµã¼¯´´¼¯ÈºÁ´½Ó¶ÔÏó
-					// JedisCluster jedisCluster = new
-					// JedisCluster(jedisClusterNodes);
-					// ¼¯Èº¸÷½Úµã¼¯ºÏ£¬³¬Ê±Ê±¼ä£¬×î¶àÖØ¶¨Ïò´ÎÊı£¬Á´½Ó³Ø
-					jedisCluster = new JedisCluster(jedisClusterNodes, 1000, 1000, 10, "spz", getJedisPoolConfig());
-				}
-			}
-		}
-		return jedisCluster;
-	}
+        if (jedisCluster == null) {
+            synchronized (JedisUtil.class) {
+                if (jedisCluster == null) {
+                    // Redisé›†ç¾¤çš„èŠ‚ç‚¹é›†åˆ
+                    Set<HostAndPort> jedisClusterNodes = new HashSet<HostAndPort>();
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 1000));
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 1001));
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 2000));
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 2001));
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 3000));
+                    jedisClusterNodes.add(new HostAndPort("192.168.88.131", 3001));
+                    // æ ¹æ®èŠ‚ç‚¹é›†åˆ›é›†ç¾¤é“¾æ¥å¯¹è±¡
+                    // JedisCluster jedisCluster = new
+                    // JedisCluster(jedisClusterNodes);
+                    // é›†ç¾¤å„èŠ‚ç‚¹é›†åˆï¼Œè¶…æ—¶æ—¶é—´ï¼Œæœ€å¤šé‡å®šå‘æ¬¡æ•°ï¼Œé“¾æ¥æ± 
+                    jedisCluster = new JedisCluster(jedisClusterNodes, 1000, 1000, 10, "spz", getJedisPoolConfig());
+                }
+            }
+        }
+        return jedisCluster;
+    }
 
-	// ¹Ø±ÕÊÍ·Å
-	public static void release(JedisPool jedisPool, Jedis jedis) {
-		if (jedis != null) {
-			// jedisPool.returnResourceObject(jedis);
-			jedis.close();
-		}
-	}
+    // å…³é—­é‡Šæ”¾
+    public static void release(JedisPool jedisPool, Jedis jedis) {
+        if (jedis != null) {
+            // jedisPool.returnResourceObject(jedis);
+            jedis.close();
+        }
+    }
 }
