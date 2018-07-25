@@ -3,6 +3,9 @@
  */
 package com.bdqn.spz.spring.redis.redis;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
@@ -13,6 +16,7 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisShardInfo;
 import redis.clients.jedis.ShardedJedis;
+import redis.clients.jedis.ShardedJedisPipeline;
 import redis.clients.jedis.ShardedJedisPool;
 
 /**
@@ -91,6 +95,15 @@ public class JedisClient {
 	}
 
 	public static void main(String[] args) {
-		new JedisClient().testJedisShardInfo();
+	    List<JedisShardInfo> shards = Arrays.asList(
+                new JedisShardInfo("127.0.0.1", 6379)
+                //new JedisShardInfo("192.168.104.15", 6379)
+        );
+        ShardedJedis shardedJedis = new ShardedJedis(shards);
+        ShardedJedisPipeline shardedJedisPipeline = shardedJedis.pipelined();
+        for (int i = 0; i < 10; i++) {
+            shardedJedisPipeline.set("k" + i, "v" + i);
+        }
+        shardedJedisPipeline.sync();
 	}
 }
