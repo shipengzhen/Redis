@@ -2,6 +2,8 @@ package com.bdqn.spz.spring.redis.redis;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.log4j.Logger;
 //import org.apache.log4j.Logger;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -13,13 +15,11 @@ import redis.clients.jedis.exceptions.JedisException;
 
 public class ShardedJedisClient {
 
-    //private static final Logger logger = Logger.getLogger(ShardedJedisClient.class);
+    private static final Logger logger = Logger.getLogger(ShardedJedisClient.class);
 
     private ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext-redis.xml");
 
     private ShardedJedisPool shardedJedisPool = context.getBean("shardedJedisPool", ShardedJedisPool.class);
-
-    private ShardedJedis shardedJedis = shardedJedisPool.getResource();
 
     /**
      * @功能描述：获取ShardedJedis对象
@@ -28,35 +28,42 @@ public class ShardedJedisClient {
      * @创建时间：2018年7月25日 下午2:12:22
      */
     private ShardedJedis getResource() {
-        ShardedJedis shardedJedis = this.shardedJedis;
-        if (null == shardedJedis) {
-            ShardedJedisPool shardedJedisPool = this.shardedJedisPool;
+        ShardedJedis shardedJedis = null;
+        try {
+            ShardedJedisPool shardedJedisPool=this.shardedJedisPool;
             if (null == shardedJedisPool) {
-                shardedJedisPool = context.getBean("shardedJedisPool", ShardedJedisPool.class);
+                throw new JedisException("shardedJedisPool 为  null");
+            } else {
+                shardedJedis = shardedJedisPool.getResource();
+                logger.info("创建ShardedJedis实例成功------------------>");
             }
-            shardedJedis = shardedJedisPool.getResource();
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.info("创建ShardedJedis实例失败------------------>");
         }
         return shardedJedis;
     }
 
     /**
-     * 将字符串值 value 关联到 key 。 如果 key 已经持有其他值， SET 就覆写旧值，无视类型。
-     * 
-     * @param key
-     *            关键字
-     * @param value
-     *            值
-     * @return 状态码 OK <br>
-     *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
+     * @功能描述：将字符串值 value 关联到 key 。 如果 key 已经持有其他值， SET 就覆写旧值，无视类型。设置成功返回true,反之false
+     * @参数说明：@param key
+     * @参数说明：@param value
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年7月29日 下午12:26:20
      */
-    public String set(String key, String value) {
+    public boolean set(String key, String value) {
         ShardedJedis shardedJedis = null;
-        String status = null;
-
+        boolean status = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
-                status = shardedJedis.set(key, value);
+                String statusCode = shardedJedis.set(key, value);
+                if (null != statusCode) {
+                    if ("OK".equals(statusCode)) {
+                        status = true;
+                    }
+                }
             }
         } catch (JedisException e) {
             e.printStackTrace();
@@ -69,25 +76,28 @@ public class ShardedJedisClient {
     }
 
     /**
-     * 将Object对象值 value 关联到 key 。 如果 key 已经持有其他值， SET 就覆写旧值，无视类型。
-     * 
-     * @param key
-     *            关键字
-     * @param value
-     *            对象值
-     * @return 状态码 OK <br>
-     *         <b>Tips:</b>若要使用返回值，请做null值校验。和服务器建立连接多次失败，则返回null
+     * @功能描述：设置成功返回true,反之false
+     * @参数说明：@param key
+     * @参数说明：@param value
+     * @参数说明：@param seconds
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年7月29日 下午12:19:34
      */
-    public String set(String key, Object value) {
+    public boolean set(String key, String value, int seconds) {
         ShardedJedis shardedJedis = null;
-        String statusCode = null;
-        byte[] valueBytes = null;
-
+        boolean status = false;
         try {
             shardedJedis = getResource();
             if (shardedJedis != null) {
-                valueBytes = CommonUtil.serialize(value);
-                statusCode = shardedJedis.set(key.getBytes(), valueBytes);
+                if (this.set(key, value)) {
+                    Long statusCodeLong = this.expire(key, seconds);
+                    if (null != statusCodeLong) {
+                        if (1 == statusCodeLong) {
+                            status = true;
+                        }
+                    }
+                }
             }
         } catch (JedisException e) {
             e.printStackTrace();
@@ -96,7 +106,74 @@ public class ShardedJedisClient {
         } finally {
             shardedJedis.close();
         }
-        return statusCode;
+        return status;
+    }
+
+    /**
+     * @功能描述：将字符串值 value 关联到 key 。 如果 key 已经持有其他值， SET 就覆写旧值，无视类型。设置成功返回true,反之false
+     * @参数说明：@param key
+     * @参数说明：@param value
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年7月29日 下午12:32:57
+     */
+    public boolean set(String key, Object value) {
+        ShardedJedis shardedJedis = null;
+        byte[] valueBytes = null;
+        boolean status = false;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                valueBytes = CommonUtil.serialize(value);
+                String statusCode = shardedJedis.set(key.getBytes(), valueBytes);
+                if (null != statusCode) {
+                    if ("OK".equals(statusCode)) {
+                        status = true;
+                    }
+                }
+            }
+        } catch (JedisException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            shardedJedis.close();
+        }
+        return status;
+    }
+
+    /**
+     * @功能描述：设置成功返回true,反之false
+     * @参数说明：@param key
+     * @参数说明：@param value
+     * @参数说明：@param seconds
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年7月29日 下午12:19:34
+     */
+    public boolean set(String key, Object value, int seconds) {
+        ShardedJedis shardedJedis = null;
+        boolean status = false;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                if (this.set(key, value)) {
+                    Long statusCodeLong = this.expire(key, seconds);
+                    if (null != statusCodeLong) {
+                        if (1 == statusCodeLong) {
+                            status = true;
+                        }
+                    }
+                }
+            }
+        } catch (JedisException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            shardedJedis.close();
+        }
+        return status;
     }
 
     /**

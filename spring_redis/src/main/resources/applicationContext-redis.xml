@@ -78,12 +78,9 @@
 
 	<!-- jedis方式1 -->
 	<!--单机版 -->
-	<bean id="jedisShardInfo1" class="redis.clients.jedis.JedisShardInfo">
-		<!-- ip地址 -->
+	<bean id="jedisShardInfo" class="redis.clients.jedis.JedisShardInfo">
 		<constructor-arg name="host" value="${redis.host}"></constructor-arg>
-		<!-- 端口号 -->
 		<constructor-arg name="port" value="${redis.port}"></constructor-arg>
-		<!-- 密码 -->
 		<property name="password" value="${redis.pass}"></property>
 	</bean>
 
@@ -91,9 +88,10 @@
 	<bean name="shardedJedisPool" class="redis.clients.jedis.ShardedJedisPool">
 		<constructor-arg name="poolConfig" ref="poolConfig"></constructor-arg>
 		<constructor-arg name="shards">
-			<set>
-				<ref bean="jedisShardInfo1" />
-			</set>
+			<list>
+				<!-- 注入多个只最后一个有效 -->
+				<ref bean="jedisShardInfo" />
+			</list>
 		</constructor-arg>
 	</bean>
 
@@ -101,10 +99,10 @@
 	<!--单机版 -->
 	<bean id="jedisPool" class="redis.clients.jedis.JedisPool">
 		<constructor-arg name="poolConfig" ref="poolConfig"></constructor-arg>
-		<constructor-arg name="host" value="${redis.host}"></constructor-arg>
-		<constructor-arg name="port" value="${redis.port}"></constructor-arg>
+		<constructor-arg name="host" value="${redis.cluster.host2}"></constructor-arg>
+		<constructor-arg name="port" value="${redis.cluster.port2}"></constructor-arg>
 		<constructor-arg name="timeout" value="1000"></constructor-arg>
-		<constructor-arg name="password" value="${redis.pass}"></constructor-arg>
+		<!-- <constructor-arg name="password" value="${redis.pass}"></constructor-arg> -->
 	</bean>
 
 	<!--集群版 -->
@@ -132,14 +130,43 @@
 		<constructor-arg name="host" value="${redis.cluster.host6}"></constructor-arg>
 		<constructor-arg name="port" value="${redis.cluster.port6}"></constructor-arg>
 	</bean>
+	<bean id="hostAndPort7" class="redis.clients.jedis.HostAndPort">
+		<constructor-arg name="host" value="${redis.cluster.host7}"></constructor-arg>
+		<constructor-arg name="port" value="${redis.cluster.port7}"></constructor-arg>
+	</bean>
+	<bean id="hostAndPort8" class="redis.clients.jedis.HostAndPort">
+		<constructor-arg name="host" value="${redis.cluster.host8}"></constructor-arg>
+		<constructor-arg name="port" value="${redis.cluster.port8}"></constructor-arg>
+	</bean>
+	<bean id="hostAndPort9" class="redis.clients.jedis.HostAndPort">
+		<constructor-arg name="host" value="${redis.cluster.host9}"></constructor-arg>
+		<constructor-arg name="port" value="${redis.cluster.port9}"></constructor-arg>
+	</bean>
 
-	<!-- <bean id="jedisCluster" class="redis.clients.jedis.JedisCluster"> <constructor-arg 
-		name="jedisClusterNode"> <set> <ref bean="hostAndPort1" /> <ref bean="hostAndPort2" 
-		/> <ref bean="hostAndPort3" /> <ref bean="hostAndPort4" /> <ref bean="hostAndPort5" 
-		/> <ref bean="hostAndPort6" /> </set> </constructor-arg> 设置连接超时时间 <constructor-arg 
-		name="connectionTimeout" value="10"></constructor-arg> 设置网络通信超时时间 <constructor-arg 
-		name="soTimeout" value="1000"></constructor-arg> 设置最大重试次数 <constructor-arg 
-		name="maxAttempts" value="10"></constructor-arg> 设置集群访问密码 <constructor-arg 
-		name="password" value="${redis.pass}"></constructor-arg> 设置jedisPool配置 <constructor-arg 
-		name="poolConfig" ref="poolConfig"></constructor-arg> </bean> -->
+	<bean id="jedisCluster" class="redis.clients.jedis.JedisCluster">
+		<constructor-arg name="jedisClusterNode">
+			<set>
+				<!-- 前俩个有校验 -->
+				<ref bean="hostAndPort1" />
+				<ref bean="hostAndPort2" />
+				<ref bean="hostAndPort3" />
+				<ref bean="hostAndPort4" />
+				<ref bean="hostAndPort5" />
+				<ref bean="hostAndPort6" />
+				<ref bean="hostAndPort7" />
+				<ref bean="hostAndPort8" />
+				<ref bean="hostAndPort9" />
+			</set>
+		</constructor-arg>
+		<!-- 设置连接超时时间 -->
+		<constructor-arg name="connectionTimeout" value="10"></constructor-arg>
+		<!-- 设置网络通信超时时间 -->
+		<constructor-arg name="soTimeout" value="1000"></constructor-arg>
+		<!-- 设置最大重试次数 -->
+		<constructor-arg name="maxAttempts" value="10"></constructor-arg>
+		<!-- 设置集群访问密码 -->
+		<!-- <constructor-arg name="password" value="${redis.pass}"></constructor-arg> -->
+		<!-- 设置jedisPool配置 -->
+		<constructor-arg name="poolConfig" ref="poolConfig"></constructor-arg>
+	</bean>
 </beans>
