@@ -4,7 +4,9 @@ import java.io.IOException;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.data.redis.connection.RedisClusterConfiguration;
 
+import com.bdqn.spz.spring.redis.redis.RedisClient;
 import com.bdqn.spz.spring.redis.redis.ShardedJedisClient;
 
 import redis.clients.jedis.Jedis;
@@ -44,8 +46,23 @@ public class Test {
             }
         }catch (Exception e) {
            e.printStackTrace();
+           for (int i = 0; i < 100; i++) {
+               System.out.println(jedisCluster.set("name" + i, "spz" + i));
+               System.out.println(jedisCluster.get("name" + i));
+           }
         } finally {
-            jedisCluster.close();
+            if(null!=jedisCluster){
+                jedisCluster.close();
+            }
+        }
+    }
+    
+    public void redisClusterConfigurationTest(){
+        RedisClient redisClient=new RedisClient();
+        for (int i = 0; i < 100; i++) {
+            redisClient.set("name" + i, "spz" + i);
+            System.out.println(redisClient.get("name" + i));
+            redisClient.del("name"+i);
         }
     }
 
