@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.springframework.data.redis.connection.RedisClusterConfiguration;
 
 import com.bdqn.spz.spring.redis.redis.RedisClient;
 import com.bdqn.spz.spring.redis.redis.ShardedJedisClient;
@@ -37,37 +36,33 @@ public class Test {
     public void JedisClusterTest() throws IOException {
         @SuppressWarnings("resource")
         ApplicationContext context = new ClassPathXmlApplicationContext("applicationContext-redis.xml");
-        JedisCluster jedisCluster=null;
+        JedisCluster jedisCluster = null;
         try {
-             jedisCluster = context.getBean("jedisCluster", JedisCluster.class);
+            jedisCluster = context.getBean("jedisCluster", JedisCluster.class);
             for (int i = 0; i < 100; i++) {
                 System.out.println(jedisCluster.set("name" + i, "spz" + i));
                 System.out.println(jedisCluster.get("name" + i));
             }
-        }catch (Exception e) {
-           e.printStackTrace();
-           for (int i = 0; i < 100; i++) {
-               System.out.println(jedisCluster.set("name" + i, "spz" + i));
-               System.out.println(jedisCluster.get("name" + i));
-           }
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
-            if(null!=jedisCluster){
+            if (null != jedisCluster) {
                 jedisCluster.close();
             }
         }
     }
-    
-    public void redisClusterConfigurationTest(){
-        RedisClient redisClient=new RedisClient();
+
+    public void redisClusterConfigurationTest() {
+        RedisClient redisClient = new RedisClient();
         for (int i = 0; i < 100; i++) {
             redisClient.set("name" + i, "spz" + i);
             System.out.println(redisClient.get("name" + i));
-            redisClient.del("name"+i);
+            redisClient.del("name" + i);
         }
     }
 
     public static void main(String[] args) throws IOException {
 
-        new Test().JedisClusterTest();
+        new Test().redisClusterConfigurationTest();
     }
 }

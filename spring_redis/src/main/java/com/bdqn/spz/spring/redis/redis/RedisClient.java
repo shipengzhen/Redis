@@ -33,6 +33,7 @@ public class RedisClient {
 
     private static RedisConnection redisConnection = redisConnectionFactory.getConnection();
 
+    @SuppressWarnings("unchecked")
     public static void main(String[] args) {
         List<Student> students = new ArrayList<Student>();
 

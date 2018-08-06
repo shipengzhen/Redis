@@ -97,7 +97,7 @@
 		</property>
 	</bean>
 
-	<!--redis 主从配置 -->
+	<!--redis 主从配置(哨兵模式) -->
 	<bean id="redisSentinelConfiguration"
 		class="org.springframework.data.redis.connection.RedisSentinelConfiguration">
 		<property name="master">
@@ -107,16 +107,15 @@
 		</property>
 		<property name="sentinels">
 			<set>
-				<bean class="org.springframework.data.redis.connection.RedisNode">
-					<constructor-arg name="host" value="${sentinel1.host}"></constructor-arg>
-
-					<constructor-arg name="port" value="${sentinel1.port}"></constructor-arg>
-				</bean>
-				<bean class="org.springframework.data.redis.connection.RedisNode">
-					<constructor-arg name="host" value="${sentinel2.host}"></constructor-arg>
-
-					<constructor-arg name="port" value="${sentinel2.port}"></constructor-arg>
-				</bean>
+				<ref bean="redisNode1" />
+				<ref bean="redisNode2" />
+				<ref bean="redisNode3" />
+				<ref bean="redisNode4" />
+				<ref bean="redisNode5" />
+				<ref bean="redisNode6" />
+				<ref bean="redisNode7" />
+				<ref bean="redisNode8" />
+				<ref bean="redisNode9" />
 			</set>
 		</property>
 	</bean>
@@ -131,7 +130,7 @@
 		<!-- <property name="timeout" value="${redis.timeout}" /> -->
 		<!-- 集群 -->
 		<constructor-arg name="clusterConfig" ref="redisClusterConfiguration" />
-		<!-- 主从配置 -->
+		<!-- 主从配置(哨兵模式) -->
 		<!-- <constructor-arg name="sentinelConfig" ref="redisSentinelConfiguration"></constructor-arg> -->
 		<constructor-arg name="poolConfig" ref="poolConfig" />
 	</bean>
@@ -196,7 +195,7 @@
 		<constructor-arg name="host" value="${redis.host}"></constructor-arg>
 		<constructor-arg name="port" value="${redis.port}"></constructor-arg>
 		<constructor-arg name="timeout" value="1000"></constructor-arg>
-		<constructor-arg name="password" value="${redis.pass}"></constructor-arg>
+		<!-- <constructor-arg name="password" value="${redis.pass}"></constructor-arg> -->
 	</bean>
 
 	<!--集群版 -->

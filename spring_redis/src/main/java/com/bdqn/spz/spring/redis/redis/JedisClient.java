@@ -99,6 +99,7 @@ public class JedisClient {
                 new JedisShardInfo("127.0.0.1", 6379)
                 //new JedisShardInfo("192.168.104.15", 6379)
         );
+        @SuppressWarnings("resource")
         ShardedJedis shardedJedis = new ShardedJedis(shards);
         ShardedJedisPipeline shardedJedisPipeline = shardedJedis.pipelined();
         for (int i = 0; i < 10; i++) {
