@@ -810,5 +810,55 @@ public class ShardedJedisClient {
 
         return value;
     }
+    
+    /**
+     * @功能描述：每次加一
+     * @参数说明：@param key
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年8月12日 下午2:54:28
+     */
+    public Long incr(String key){
+        ShardedJedis shardedJedis = null;
+        Long value = null;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                value = shardedJedis.incr(key);
+            }
+        } catch (JedisException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            shardedJedis.close();
+        }
+        return value;
+    }
+    
+    /**
+     * @功能描述：每次加一
+     * @参数说明：@param key
+     * @参数说明：@return
+     * @作者： shipengzhen
+     * @创建时间：2018年8月12日 下午2:55:16
+     */
+    public Long incr(byte[] key){
+        ShardedJedis shardedJedis = null;
+        Long value = null;
+        try {
+            shardedJedis = getResource();
+            if (shardedJedis != null) {
+                value = shardedJedis.incr(key);
+            }
+        } catch (JedisException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            shardedJedis.close();
+        }
+        return value;
+    }
 
 }

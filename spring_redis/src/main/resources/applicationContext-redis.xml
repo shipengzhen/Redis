@@ -182,7 +182,7 @@
 		<constructor-arg name="poolConfig" ref="poolConfig"></constructor-arg>
 		<constructor-arg name="shards">
 			<list>
-				<ref bean="jedisShardInfo1" />
+				<!-- <ref bean="jedisShardInfo1" /> -->
 				<ref bean="jedisShardInfo2" />
 			</list>
 		</constructor-arg>

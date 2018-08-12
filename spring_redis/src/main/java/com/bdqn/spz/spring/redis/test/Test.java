@@ -16,10 +16,11 @@ public class Test {
 
     public void ShardedJedisClientTest() {
         ShardedJedisClient shardedJedisClient = new ShardedJedisClient();
-        for (int i = 0; i < 100; i++) {
-            System.out.println(shardedJedisClient.set("name" + i, "spz" + i));
-            System.out.println(shardedJedisClient.get("name" + i));
-        }
+       String key="spz";
+       shardedJedisClient.set(key,"1",600);
+       System.out.println(shardedJedisClient.ttl(key));
+       shardedJedisClient.incr(key);
+       System.out.println(shardedJedisClient.ttl(key));
     }
 
     public void JedisPoolTest() {
@@ -63,6 +64,6 @@ public class Test {
 
     public static void main(String[] args) throws IOException {
 
-        new Test().redisClusterConfigurationTest();
+        new Test().ShardedJedisClientTest();
     }
 }
