@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Set;
 
 import javax.annotation.Resource;
+
 import org.apache.log4j.Logger;
+
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.Pipeline;
@@ -45,72 +47,53 @@ public class JedisUtil {
      */
     public Jedis getResource() throws Exception {
         logger.debug("[JedisUtil:getResource]: get jedis Resource from Pool...");
-        Jedis jedis = null;//声明jedis对象
-        int cycleTimes = 0;//出现异常已经循环获取的次数
+        Jedis jedis = null;// 声明jedis对象
+        int cycleTimes = 0;// 出现异常已经循环获取的次数
         try {
-            jedis = this.jedisPool.getResource();//从pool中获取jedis对象
+            jedis = this.jedisPool.getResource();// 从pool中获取jedis对象
         } catch (JedisConnectionException ex) {
             try {
-                //获取占用异常,捕获异常,等待0.5秒后继续执行获取
-                logger.debug(
-                        "[JedisUtil:getResource]:redis pool is full,Program will sleep 0.5s to wait an idle.message:\n"
+                // 获取占用异常,捕获异常,等待0.5秒后继续执行获取
+                logger.debug("[JedisUtil:getResource]:redis pool is full,Program will sleep 0.5s to wait an idle.message:\n"
                                 + ex.getMessage());
 
                 while (cycleTimes < 3) {
-                    cycleTimes++;//获取次数 +1;
-                    Thread.sleep(500);//等待0.5s
+                    cycleTimes++;// 获取次数 +1;
+                    Thread.sleep(500);// 等待0.5s
 
                     logger.debug("[JedisUtil:getResource]:waiting to get an idle...");
                     try {
-                        jedis = this.jedisPool.getResource();//重新获取jedis对象
+                        jedis = this.jedisPool.getResource();// 重新获取jedis对象
                     } catch (JedisConnectionException ex1) {
                         logger.debug("[JedisUtil:getResource]:get an idle failed.Program will try again.");
-                        //出现获取异常,继续执行
+                        // 出现获取异常,继续执行
                         continue;
                     }
 
-                    //获取到对象后跳出循环
+                    // 获取到对象后跳出循环
                     if (jedis != null) {
-                        //输出获取成功的消息
+                        // 输出获取成功的消息
                         logger.debug("[JedisUtil:getResource]:get an idle success.");
                         break;
-                    } else { //如果获取出对象为null,则继续循环等待获取.
+                    } else { // 如果获取出对象为null,则继续循环等待获取.
                         logger.debug("[JedisUtil:getResource]:get an idle is null.Program will try again.");
                         continue;
                     }
                 }
             }
-            //处理线程截断异常
+            // 处理线程截断异常
             catch (InterruptedException e) {
                 logger.error("[JedisUtil:getResource]:get jedis object failed.message:\n" + e.getMessage());
             }
         }
-        //获取对象如果不为空则返回
+        // 获取对象如果不为空则返回
         if (jedis != null) {
             logger.debug("[JedisUtil:getResource]: get jedis Resource from Pool success.");
-        } else {//当循环获取超过三次直接抛出异常 返回null
-            logger.error(
-                    "[JedisUtil:getResource]:get jedis object failed.if redis server is runing,please check the configration and Network connection.");
+        } else {// 当循环获取超过三次直接抛出异常 返回null
+            logger.error("[JedisUtil:getResource]:get jedis object failed.if redis server is runing,please check the configration and Network connection.");
             throw new Exception("server can not get jedis Resource!");
         }
         return jedis;
-    }
-
-    /**
-     * 方法描述:使用完毕后将jedis对象归还连接池
-     * @param Jedis 从pool中获取的jedis对象
-     * date:Nov 14, 2013
-     * add by: houxu@xwtec.cn
-     */
-    public void returnResource(Jedis jedis) {
-        try {
-            if (jedis != null)
-                this.jedisPool.returnResource(jedis);//归还对象至pool
-            logger.debug("[JedisUtil:returnResource]: return jedis Resource to Pool  ...");
-        } catch (JedisConnectionException ex) {
-            //归还失败,强制销毁该链接
-            this.jedisPool.returnBrokenResource(jedis);
-        }
     }
 
     /**
@@ -123,19 +106,19 @@ public class JedisUtil {
      */
     public String getRedisStrValue(String key) throws Exception {
 
-        Jedis jedis = null;//声明一个链接对象
-        String value = null;//获取的键值所对应的值
+        Jedis jedis = null;// 声明一个链接对象
+        String value = null;// 获取的键值所对应的值
 
         try {
-            jedis = this.getResource();//获取jedis资源
+            jedis = this.getResource();// 获取jedis资源
 
-            //资源不为空,则获取对应的value
+            // 资源不为空,则获取对应的value
             if (jedis != null)
                 value = jedis.get(key);
 
         } finally {
             if (jedis != null)
-                this.returnResource(jedis);
+                jedis.close();
         }
         return value;
     }
@@ -151,21 +134,21 @@ public class JedisUtil {
      */
     public boolean setRedisStrValue(String key, String value) throws Exception {
 
-        Jedis jedis = null;//声明一个链接对象
-        boolean flag = true;//返回标记,默认成功
+        Jedis jedis = null;// 声明一个链接对象
+        boolean flag = true;// 返回标记,默认成功
 
         try {
-            jedis = this.getResource();//获取资源
+            jedis = this.getResource();// 获取资源
 
-            //资源不为空则执行注入操作 否则返回注入失败
+            // 资源不为空则执行注入操作 否则返回注入失败
             if (jedis != null)
                 jedis.set(key, value);
             else
                 flag = false;
         } finally {
-            //归还资源
+            // 归还资源
             if (jedis != null)
-                this.returnResource(jedis);
+                jedis.close();
         }
         return flag;
     }
@@ -182,33 +165,33 @@ public class JedisUtil {
      */
     public boolean setRedisStrValue(String key, String value, int seconds) throws Exception {
 
-        boolean flag = true;//返回标记,默认成功
+        boolean flag = true;// 返回标记,默认成功
 
-        //如果设置时间为负数,则无上限时间
+        // 如果设置时间为负数,则无上限时间
         if (seconds <= 0) {
             this.setRedisStrValue(key, value);
             return flag;
         }
 
-        Jedis jedis = null;//声明一个链接对象
+        Jedis jedis = null;// 声明一个链接对象
 
         try {
-            jedis = this.getResource();//获取资源
+            jedis = this.getResource();// 获取资源
 
-            //资源不为空则执行注入操作 否则返回注入失败
+            // 资源不为空则执行注入操作 否则返回注入失败
             if (jedis != null) {
-                //判断是否已经存在,如果已经存在则删除
+                // 判断是否已经存在,如果已经存在则删除
                 if (jedis.exists(key)) {
                     jedis.del(key);
                 }
-                //该方法内容为,如果含有相同的key值,则不覆盖.
+                // 该方法内容为,如果含有相同的key值,则不覆盖.
                 jedis.setex(key, seconds, value);
             } else
                 flag = false;
         } finally {
-            //归还资源
+            // 归还资源
             if (jedis != null)
-                this.returnResource(jedis);
+                jedis.close();
         }
         return flag;
     }
@@ -223,20 +206,20 @@ public class JedisUtil {
      */
     public boolean delRedisStrValue(String... keys) throws Exception {
 
-        Jedis jedis = null;//声明一个链接对象
-        boolean flag = true;//返回标记,默认成功
+        Jedis jedis = null;// 声明一个链接对象
+        boolean flag = true;// 返回标记,默认成功
         try {
-            jedis = this.getResource();//获取资源
+            jedis = this.getResource();// 获取资源
 
-            //资源不为空则执行删除操作 否则返回注入失败
+            // 资源不为空则执行删除操作 否则返回注入失败
             if (jedis != null)
                 jedis.del(keys);
             else
                 flag = false;
         } finally {
-            //归还资源
+            // 归还资源
             if (jedis != null)
-                this.returnResource(jedis);
+                jedis.close();
         }
         return flag;
     }
@@ -246,24 +229,25 @@ public class JedisUtil {
      * date:2013-11-19
      * add by: liuwenbing@xwtec.cn
      */
+    @SuppressWarnings("deprecation")
     public Set<String> getKeys(String keyPrefix) {
 
         logger.info("RedisUtil.getKeys param: " + keyPrefix);
 
-        Jedis jedis = null;//jedis对象
-        Set<String> keys = null;//keys列表
+        Jedis jedis = null;// jedis对象
+        Set<String> keys = null;// keys列表
 
         try {
-            //获取连接
+            // 获取连接
             jedis = this.getResource();
-            //根据前台传过来的规则获取缓存key列表
+            // 根据前台传过来的规则获取缓存key列表
             if (null != keyPrefix && !"".equals(keyPrefix)) {
                 keys = jedis.keys(keyPrefix);
             }
         } catch (Exception e) {
             logger.error("[JedisUtil.getKeys]:failed. throw e:" + e.getMessage());
         } finally {
-            //使用完毕后将jedis对象归还连接池
+            // 使用完毕后将jedis对象归还连接池
             if (jedis != null)
                 jedisPool.returnResource(jedis);
         }
@@ -283,8 +267,8 @@ public class JedisUtil {
         Jedis jedis = null;
         boolean flag = true;
         try {
-            jedis = this.getResource();//获取资源
-            //资源不为空则执行注入操作 否则返回注入失败
+            jedis = this.getResource();// 获取资源
+            // 资源不为空则执行注入操作 否则返回注入失败
             if (jedis != null) {
                 Pipeline pipeline = jedis.pipelined();
                 for (int i = 0; i < list.size(); i++) {
@@ -300,7 +284,7 @@ public class JedisUtil {
             logger.error("数据存入redis失败...抛出异常" + e.getMessage());
         } finally {
             if (jedis != null) {
-                jedisPool.returnResource(jedis);
+                jedisPool.close();
             }
         }
         return flag;
@@ -330,7 +314,7 @@ public class JedisUtil {
             logger.error("以" + baseKey + "为基准与" + otherKey + "对比数据失败...失败原因:" + e.getMessage());
         } finally {
             if (jedis != null) {
-                jedisPool.returnResource(jedis);
+                jedisPool.close();
             }
         }
         return rst;
@@ -344,6 +328,7 @@ public class JedisUtil {
      * @作者： liuyi
      * @创建时间：2017年8月29日 下午2:59:02
      */
+    @SuppressWarnings("deprecation")
     public List<Object> queryListByLPop(String key, int batch) {
         List<Object> result = new ArrayList<Object>();
         Jedis jedis = null;
@@ -384,7 +369,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return quantity;
     }
@@ -408,7 +393,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return flag;
     }
@@ -436,7 +421,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return resultCode;
     }
@@ -460,7 +445,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return result;
     }
@@ -488,7 +473,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return result;
     }
@@ -517,7 +502,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return type;
     }
@@ -543,7 +528,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return status;
     }
@@ -571,7 +556,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return statusCode;
     }
@@ -595,7 +580,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
 
         return value;
@@ -621,7 +606,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         Object obj = null;
         if (value != null) {
@@ -656,7 +641,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return element;
     }
@@ -682,7 +667,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return len;
     }
@@ -706,7 +691,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
 
         return element;
@@ -734,7 +719,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return size;
     }
@@ -763,7 +748,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return size;
     }
@@ -792,7 +777,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return size;
     }
@@ -823,7 +808,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return elements;
     }
@@ -850,7 +835,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
 
         if (bytes != null && bytes.size() > 0) {
@@ -886,7 +871,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
         return quantity;
     }
@@ -907,7 +892,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
 
         return value;
@@ -929,7 +914,7 @@ public class JedisUtil {
         } catch (Exception e) {
             handleJedisException(e);
         } finally {
-            returnResource(shardedJedis);
+            shardedJedis.close();
         }
 
         return value;

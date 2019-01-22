@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
+
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisShardInfo;
 import redis.clients.jedis.ShardedJedis;
@@ -130,8 +131,8 @@ public class JedisClient {
             shardedJedisPool = new ShardedJedisPool(config, shards);
         }
 
-        logger.info(
-                "-- PushReadRedisClient initializer finish! times:" + (System.currentTimeMillis() - startTime) + "ms");
+        logger.info("-- PushReadRedisClient initializer finish! times:" + (System.currentTimeMillis() - startTime)
+                        + "ms");
     }
 
     /**
@@ -150,29 +151,6 @@ public class JedisClient {
      */
     private ShardedJedis getResource() {
         return shardedJedisPool == null ? null : shardedJedisPool.getResource();
-    }
-
-    /**
-     * 异常情况处理
-     * 
-     * @param ShardedJedis
-     */
-    private void returnBrokenResource(ShardedJedis ShardedJedis) {
-        if (ShardedJedis != null && shardedJedisPool != null) {
-            shardedJedisPool.returnBrokenResource(ShardedJedis);
-            ShardedJedis = null;
-        }
-    }
-
-    /**
-     * 使用完成后归还ShardedJedis到連接池
-     * 
-     * @param ShardedJedis
-     */
-    private void returnResource(ShardedJedis ShardedJedis) {
-        if (ShardedJedis != null && shardedJedisPool != null) {
-            shardedJedisPool.returnResource(ShardedJedis);
-        }
     }
 
     /**
@@ -829,13 +807,13 @@ public class JedisClient {
     private void closeResource(ShardedJedis shardedJedis, boolean conectionBroken) {
         try {
             if (conectionBroken) {
-                shardedJedisPool.returnBrokenResource(shardedJedis);
+                shardedJedisPool.close();
             } else {
-                shardedJedisPool.returnResource(shardedJedis);
+                shardedJedisPool.close();
             }
         } catch (Exception e) {
             logger.error("return back jedis failed, will fore close the jedis.", e);
-            shardedJedisPool.destroy();
+            shardedJedisPool.close();
         }
     }
 
